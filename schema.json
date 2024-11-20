@@ -1,0 +1,8 @@
+{
+    "name": "Primerchik",
+    "tuples_limit": 3,
+    "structure": {
+        "table1": ["id", "Name", "count", "coast"],
+        "table2": ["id", "Name"]
+    }
+}
