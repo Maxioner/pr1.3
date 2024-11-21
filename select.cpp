@@ -263,7 +263,7 @@ void select(const string& query, const TableJson& json_table) {
     if (iss >> oper && (oper == "AND" || oper == "OR")) {
 
         string conditionValue2;
-        iss >> slovo; // STUDENT.CURS (или другая колонка)
+        iss >> slovo; 
         string t3, c3;
         separationDot(slovo, t3, c3, json_table);  // Разделяем на таблицу и колонку
 
