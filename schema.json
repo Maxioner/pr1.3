@@ -1,8 +1,8 @@
 {
-    "name": "Primerchik",
-    "tuples_limit": 3,
+    "name": "Schema",
+    "tuples_limit": 4,
     "structure": {
-        "table1": ["id", "Name", "count", "coast"],
-        "table2": ["id", "Name"]
+        "DOTA": ["NAME", "AGE", "POL", "POSITION"],
+        "PLAYER": ["NAME", "GODA"]
     }
 }
