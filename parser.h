@@ -1,30 +1,16 @@
 #pragma once
+#include "Node.h" // структура таблиц
 #include <iostream>
+#include <string>
 #include <fstream>
-#include <filesystem>
-#include "json.hpp"
+#include <filesystem> // директории
+#include "json.hpp" // json
 
 using namespace std;
-using json = nlohmann::json;
+using json = nlohmann::json; 
+namespace fs = filesystem;
 
 
-struct Node {
-    string data; //Название столбца
-    Node* next;
-};
-
-struct Tables {
-    string name; //Название таблицы
-    Node* column;
-    Tables* next; // Следующая таблица
-};
-
-struct JsonTable { //Структура таблицы с json
-    int rowsCount; // количество строк
-    string scheme; // имя схемы
-    Tables* head;
-};
-
-void removeDir(const filesystem::path& dirPath);
-void createFiles(const filesystem::path& schemePath, const json& jsonStruct, JsonTable& jstable);
-void parser(JsonTable& jstab);
+void DelDirectory(const fs::path& directoryPath); // удаление директории
+void Create_Dir_Files(const fs::path& ShemePath, const json& structure, TableJson& json_table); // создание полной директории и файлов
+void Parser(TableJson& json_table); // парсинг схемы
