@@ -1,119 +1,155 @@
-#include <iostream>
 #include "parser.h"
 
-// Функция для удаления директории и всего её содержимого
-void removeDir(const filesystem::path& dirPath) {
-  if (filesystem::exists(dirPath)) {  /
-    filesystem::remove_all(dirPath);  
-  }
+// Удаление директории
+void DelDirectory(const fs::path& PathDirectory){
+    if (fs::exists(PathDirectory)){
+        fs::remove_all(PathDirectory);
+    }
 }
 
-// Функция для создания файлов и директорий на основе JSON-структуры
-void createFiles(const filesystem::path& schemePath, const json& jsonStruct, JsonTable& jstable) {
-  Tables* head = nullptr;  
-  Tables* tail = nullptr;  
+// Создание директории / файлов
+void Create_Dir_Files(const fs::path& PathSheme, const json& structure, TableJson& json_table){
+    Node* TableHead = nullptr;
+    Node* TableTail = nullptr;
 
-  // Проходим по каждому элементу JSON-структуры
-  for (const auto& table : jsonStruct.items()) {
-    filesystem::path tableDir = schemePath / table.key();  
-    filesystem::create_directory(tableDir);  // Создаем директорию для таблицы
-    if (!filesystem::exists(tableDir)) {  
-        cerr << "Не удалось создать директорию: " << tableDir << endl;
-        return;
+    for (const auto& table: structure.items()){
+        fs::path tablePath = PathSheme / table.key(); // Создается путь к директории
+        if (!fs::create_directories(tablePath)){
+            cerr << "Cant delete this directory: " << tablePath << endl;
+            return;
+        }
+        cout << "Directory has been created: " << tablePath << endl;
+        
+        // Создание таблицы
+        Node* newTable = new Node{table.key(), nullptr, nullptr};
+
+        // Создание файла блокировки
+        string LockFileName = table.key() + "_lock.txt";
+        ofstream LockFile(tablePath/ LockFileName);
+        if (!LockFile.is_open()){
+            cerr << "Cant open the file: " << LockFileName << endl;
+            return;
+        }
+        LockFile << "Status: Unlocked";
+        LockFile.close();
+
+        // Добавление таблицы в список
+        if (TableHead == nullptr){
+            TableHead = newTable;
+            TableTail = newTable;
+        }
+        else {
+            TableTail->next = newTable;
+            TableTail = newTable;
+        }
+
+        // Создание колонки pk
+        string KeyColumn = table.key() + "_pk";
+        ListNode* Column_PK = new ListNode{KeyColumn, nullptr};
+        newTable->column = Column_PK;
+
+        // Создание csv файла
+        fs::path CSVFilePath = tablePath / "1.csv";
+        ofstream File_CSV(CSVFilePath);
+        if (!File_CSV.is_open()){
+            cerr << "Cant create the file: " << CSVFilePath << endl;
+            return;
+        }
+        File_CSV << KeyColumn << ","; // Записывается имя колонки первичного ключа в csv файл
+
+        // Запись названий колонок в csv и добавление их в список
+        const auto& columns = table.value();
+        for (size_t i = 0; i < columns.size(); i++){
+            string Column_Name = columns[i].get<string>();
+            File_CSV << Column_Name;
+
+            // Добавление колонки в список
+            ListNode* newcolumn = new ListNode{Column_Name, nullptr};
+
+            if (newTable->column == nullptr){
+                newTable->column = newcolumn;
+            }
+            else {
+                ListNode* Last_Column = newTable->column;
+                while (Last_Column->next != nullptr){
+                    Last_Column = Last_Column->next;
+                }
+                Last_Column->next = newcolumn;
+            }
+
+            // Если последняя колонка - запятую не ставим
+            if (i < columns.size() - 1){
+                File_CSV << ",";
+            }
+        }
+
+        File_CSV << endl;
+        File_CSV.close();
+        cout << "File created: " << CSVFilePath << endl;
+
+        // Создание файла для первичного ключа
+        string PK_FileName = KeyColumn + "_sequence.txt";
+        ofstream PK_File(tablePath/ PK_FileName);
+        if (!PK_File.is_open()){
+            cerr << "Cant open the file: " << PK_FileName << endl;
+            return;
+        }
+        PK_File << "0"; // Начальный первичный ключ
+        PK_File.close();
     }
-
-    // Создаем новый элемент списка таблиц
-    Tables* newTable = new Tables{table.key(), nullptr, nullptr};
-
-    // Если список таблиц пуст, устанавливаем голову и хвост на новый элемент
-    if (head == nullptr) {
-      head = newTable;
-      tail = newTable;
-    }
-    else {  // Иначе добавляем новый элемент в конец списка
-      tail->next = newTable;
-      tail = newTable;
-    }
-
-    // Создаем файл блокировки для таблицы
-    filesystem::path lockDir = tableDir / (table.key() + "_lock.txt");
-    ofstream file(lockDir);
-    if (!file.is_open()) {  
-      cerr << "Не удалось открыть файл." << endl;
-      return;
-    }
-    file << "unlocked";  
-    file.close();
-
-    // Создаем первичный ключ для таблицы
-    string pkColumn = table.key() + "_pk";
-    Node* firstColumn = new Node{pkColumn, nullptr};
-
-    Node* headColumn = firstColumn;  // Указатель на начало списка столбцов
-    Node* tailColumn = firstColumn;  // Указатель на конец списка столбцов
-
-    // Создаем CSV-файл для таблицы
-    filesystem::path csvDir = tableDir / "1.csv";
-    ofstream csvFile(csvDir);
-    if (!csvFile.is_open()) {  // Проверяем, успешно ли открыт файл
-      cerr << "Не удалось открыть файл." << endl;
-      return;
-    }
-    csvFile << pkColumn << ",";  // Записываем первичный ключ в CSV-файл
-    
-    const auto& columns = table.value();  // Получаем список столбцов из JSON
-    for (size_t i = 0; i < columns.size(); i++) {
-      csvFile << columns[i].get<string>();  
-      Node* newColumn = new Node{columns[i].get<string>(), nullptr};
-      tailColumn->next = newColumn; 
-      tailColumn = newColumn;
-      if (i < columns.size() - 1) {
-        csvFile << ",";  // Добавляем разделитель между столбцами
-      }
-    }
-    csvFile << endl;  
-    csvFile.close();
-
-    newTable->column = headColumn;  // Устанавливаем список столбцов для таблицы
-
-    // Создаем файл последовательности для первичного ключа
-    filesystem::path sequence = tableDir / (pkColumn + "_sequence.txt");
-    ofstream seqFile(sequence);
-    if (!seqFile.is_open()) {  
-      cerr << "Не удалось открыть файл." << endl;
-      return;
-    }
-    seqFile << "0";  // Записываем начальное значение последовательности
-    seqFile.close();
-  }
-  jstable.head = head;  // Устанавливаем голову списка таблиц в структуре JsonTable
+    json_table.table_head = TableHead;
 }
 
-// Парсер
-void parser(JsonTable& jstab) {
-    ifstream file("schema.json");  
-    if (!file.is_open()) {  
-        cerr << "Не удалось открыть файл: schema.json" << endl;
+// Парсер схемы
+void Parser(TableJson& json_table){
+    string fileName = "schema.json";
+    ifstream file(fileName);
+    if (!file.is_open()){
+        cerr << "Cant open the file: " << fileName << endl;
         return;
     }
-    
-    json jspars;
-    file >> jspars;  // Загружаем JSON-данные из файла
+
+    string json_include;
+    string line;
+    while (getline(file, line)) {
+        json_include += line;
+    }
     file.close();
 
-    jstab.scheme = jspars["name"]; 
-    filesystem::path schemePath = filesystem::current_path() / jstab.scheme;  // Создаем путь к директории схемы
-    removeDir(schemePath);  // Удаляем директорию с прошлого запуска
-    filesystem::create_directory(schemePath);  // Создаем новую директорию для схемы
-    if (!filesystem::exists(schemePath)) {  
-        cerr << "Не удалось создать директорию: " << schemePath << endl;
+    json parser_Json = json::parse(json_include);
+
+    if (parser_Json.contains("name")) {
+        json_table.Name = parser_Json["name"];
+    } else {
+        cerr << "Error: 'name' not searched in shema" << endl;
         return;
     }
+fs::path schemePath = fs::current_path() / json_table.Name; // Путь к директории схемы
+    cout << "Current directory: " << fs::current_path() << endl;
+    cout << "Name of shema: " << json_table.Name << endl;
 
-    // Если JSON содержит структуру, создаем файлы и директории на основе этой структуры
-    if (jspars.contains("structure")) {
-        createFiles(schemePath, jspars["structure"], jstab);
+    // Если схема существует, удаляем её
+    if (fs::exists(schemePath)) {
+        cout << "Deleting old directory: " << schemePath << endl;
+        DelDirectory(schemePath);
     }
 
-    jstab.rowsCount = jspars["tuples_limit"];  // Получаем лимит строк из JSON
+    // Создаем директорию для схемы
+    if (!fs::create_directory(schemePath)) {
+        cerr << "Cannot create directory: " << schemePath << endl;
+        cout << "Error: " << strerror(errno) << endl;
+        return;
+    }
+    cout << "Directory has been created: " << schemePath << endl;
+
+    if (parser_Json.contains("structure")) {
+        Create_Dir_Files(schemePath, parser_Json["structure"], json_table);
+    }
+
+    if (parser_Json.contains("tuples_limit")) {
+        json_table.table_size = parser_Json["tuples_limit"];
+    } else {
+        cerr << "Error: 'tuples_limit' not searched in shema" << endl;
+        return;
+    }
 }
